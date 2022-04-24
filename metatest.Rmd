@@ -1,0 +1,388 @@
+---
+title: "META"
+output: flexdashboard::flex_dashboard
+runtime: shiny
+
+---
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(meta)
+library(readxl)
+library(dplyr)
+library(dimensionsR)
+library(bibliometrix)
+library(pubmedR)
+library(bibliometrix)
+library(kableExtra)
+```
+
+
+
+Wstęp
+===================================
+  
+  Column
+-----------------------------------------------------------------------
+  
+### **Wstęp**
+  
+  <br>
+  
+  
+  
+  
+### **Zastosowane narzędzia**
+  
+<br>
+  
+* **R **Wersja:** `r packageVersion("base")` 
+
+* **RStudio**: Integrated Development Environment for R; **Wersja:** 2021.9.1.372
+
+* **meta**: General Package for Meta-Analysis;  **Wersja:** `r packageVersion("meta")`; `r packageDate("meta")`
+
+* **shiny**: Web Application Framework for R; **Wersja:** `r packageVersion("shiny")`; `r packageDate("shiny")`
+
+
+
+Column
+-----------------------------------------------------------------------
+  
+### **Metodyka**
+  
+**Wielkość efektu**
+  
+**Heterogeniczność grup**
+  
+**Efekt stały**
+  
+**Efekt losowy**
+
+**Korekta Knappa-Hartunga ** Te korekty wpływają na sposób, w jaki błąd standardowy (a tym samym przedziały ufności) naszego połączonego rozmiaru efektu^θθ^jest wyliczone.
+  
+
+**Forrest plot:** graficzna prezentacja wielkości efektu wraz z przedziałami ufności badań włączonych do metaanalizy
+  
+**Funnel plot:**  wielkość efektu każdego badania (wyrażoną jako standaryzowana średnia różnica) na osi x oraz błąd standardowy na osi y. Asymetryczny wzór na wykresie lejkowym, który może wskazywać na stronniczość publikacji
+  
+
+### **Słownik**
+
+
+**MD, SMD** : standaryzowana średnia różnica
+
+**RR, OR, ID** Współczynnik ryzyka, iloraz szans, współczynnik zapadalności
+
+**d.f**: Degrees of freedom.
+
+Instrukcja
+===================================
+
+Column
+---
+
+### **Instrukcja**
+
+1. Wprowadź zbiór danych
+
+2. Wybierz rodzaj efektu
+
+3. Wybierz metodę szacowania wariancji między badaniami
+
+4. Określ, czy chcesz zastosować korektę Hartunga-Knappa dla efektu losowego
+
+
+### Interpretacja
+
+Do łączenia rozmiarów efektów wykorzystano model `r  renderText(ifelse(input$effect == "common", "losowy", "stały"))`. Ograniczony estymator maksymalnego prawdopodobieństwa (REML) został użyty do obliczenia wariancji heterogeniczności tau^2^. `r renderText(ifelse(input$hakn == T, "Zastosowano korektę Knappa-Hartunga do obliczenia przedziału ufności wokół efektu zbiorczego", ""))`
+
+**Wielkość efektu**
+
+
+
+**Heteterogeniczność badań**
+
+**tau^2^**: określa ilościowo wariancję rzeczywistych rozmiarów efektów
+
+**H^2^**: Gdy nie ma heterogeniczności między badaniami, H^2^ jest większe lub równe 1. Wartości większe niż jeden wskazują na występowanie niejednorodności między badaniami
+
+**Q** *(ang. Cochran’s Q measure of heterogeneity)*: miara heterogeniczności Cohrane'a
+
+**I^2^** *(ang. Higgins’ and Thompson’s measure of heterogeneity)*: miara niejednorodności Higginsa i Thompsona. Określa procent zmienności wielkości efektu, który nie jest spowodowany błędem próbkowania
+
+* I^2^= 25%: niska niejednorodność
+
+* I^2^= 50%: umiarkowana niejednorodność
+
+* I^2^ = 75%: znaczna niejednorodność.
+
+
+Column
+---
+
+### Wymagane dane
+
+### Zakres danych
+
+  
+### **Przykładowy zbiór danych**
+
+```{r echo=F, eval=F}
+
+renderTable({
+  
+  datainput()
+  
+})
+
+```
+  
+
+
+Metaanaliza
+===================================
+  
+Column {.sidebar}
+-----------------------------------------------------------------------
+```{r echo = F}
+fileInput("data", "Wczytaj dane do metaaanalizy", accept = ".xlsx")
+radioButtons("effect", "Wybierz efekt", choices = c("common", "random"))
+selectInput("sm", "Wybierz rodzaj efektu", choices = c("SMD", "MD",  "RR", "OR", "ASD", "HR","RD","ROM"))
+selectInput("method.tau", "Wybierz metodę szacowania wariancji między badaniami", choices = c("REML", "DL", "PM", "ML", "HS", "SJ", "HE", "EB"))
+checkboxInput("hakn", "Korekta Hartunga i Knappa")
+textInput("title", "Wpisz tytuł badania", "Metaanaliza")
+
+datainput <- reactive({
+  
+  data <- input$data$datapath
+  data <-  readxl::read_excel(data)
+})
+
+
+m <-  reactive({
+  
+  m.gen <- metagen(TE=TE,
+                   seTE = seTE,
+                   studlab = Author,
+                   data = datainput(),
+                   sm = input$sm, #rodzaj efektu którego używamy
+                   fixed = ifelse(input$effect == "common", TRUE,FALSE), #efekt stały 
+                   method.tau = input$method.tau, 
+                   hakn = input$hakn, #poprawka na heterogeniczność
+                   title = input$title)
+  
+})
+
+k = reactive({
+  summary(m())$k
+})
+
+sm = reactive({
+  summary(m()$sm)
+
+})
+
+```
+
+
+Column 
+-----------------------------------------------------------------------
+  
+### **Metodyka**
+
+
+Do metaanalizy włączono `r renderText(k())` badań. Do łączenia rozmiarów efektów wykorzystano model `r  renderText(ifelse(input$effect == "common", "stały","losowy"))`. Ograniczony estymator maksymalnego prawdopodobieństwa (REML) został użyty do obliczenia wariancji heterogeniczności tau^2^. `r renderText(ifelse(input$hakn == T, "Zastosowano korektę Knappa-Hartunga do obliczenia przedziału ufności wokół efektu zbiorczego", ""))`
+
+
+#### **Wielkość efektu**
+
+```{r}
+
+renderTable({
+  
+fixed <- data.frame(
+m()$TE.fixed,
+m()$lower.fixed,
+m()$upper.fixed,
+m()$seTE.fixed,
+m()$pval.fixed,
+m()$zval.fixed)
+colnames(fixed) <- c("TE", "0.95 LCI", "0.95 UCI", "SE", "p-value","z")
+fixed <- round(fixed,2)
+
+random <- data.frame(
+m()$TE.random,
+m()$lower.random,
+m()$upper.random,
+m()$seTE.random)
+colnames(random) <- c("TE", "0.95 LCI", "0.95 UCI", "SE")
+random <- round(random,2)
+
+if(input$effect == "random")
+{
+    print(random)
+} 
+else
+  print(fixed)
+
+})
+
+
+```
+
+
+
+#### **Test heterogeniczności**
+
+**Q** *(ang. Cochran’s Q measure of heterogeneity)*: miara heterogeniczności Cohrane'a
+  
+```{r}
+
+renderTable({
+  
+het <- data.frame(m()$Q,
+           m()$pval.Q,
+           m()$df.Q)
+colnames(het) <- c("Q", "p-value", "d.f")
+het
+
+})
+```
+
+#### **Quantifying heterogeneity**
+
+**tau^2^** wariancja rzeczywistych rozmiarów efektów
+
+```{r}
+renderTable({
+  
+tau2 <- data.frame(
+    round(m()$tau2,2),
+    round(m()$lower.tau2,2),
+    round(m()$upper.tau2,2))
+colnames(tau2) <- c("tau2", "0.95 LCI", "0.95 UCI")
+tau2
+})
+```
+
+**I^2^** *(ang. Higgins’ and Thompson’s measure of heterogeneity)*, miara niejednorodności Higginsa i Thompsona. Określa procent zmienności wielkości efektu, który nie jest spowodowany błędem próbkowania
+
+* I^2^= 25%: niska niejednorodność - 75%: znaczna niejednorodność
+
+
+```{r}
+renderTable({
+
+I2 = data.frame(
+    round(m()$I2,2),
+    round(m()$lower.I2,2),
+    round(m()$upper.I2,2))
+colnames(I2) <- c("I2","0.95 LCI", "0.95 UCI")
+I2
+})
+```
+
+**H^2^**: Gdy nie ma heterogeniczności między badaniami, H^2^ jest większe lub równe 1. Wartości większe niż jeden wskazują na występowanie niejednorodności między badaniami
+
+```{r}
+renderTable({
+H = data.frame(
+    round(m()$H,2),
+    round(m()$lower.H,2),
+    round(m()$upper.H,2))
+colnames(H) <- c("H","0.95 LCI", "0.95 UCI")
+H
+})
+```
+
+
+
+Column 
+-----------------------------------------------------------------------
+  
+### **Forest Plot**
+  
+```{r}
+
+renderPlot({
+  
+  forest(m(),
+         sortvar = TE,
+         plotwidth = "8cm")
+  
+})
+
+```
+
+### **Funnel Plot**
+
+```{r}
+
+renderPlot({
+  
+  funnel(m(),
+         studlab = T,
+         ref.triangle =T,
+         contour = c(0.9, 0.95, 0.99))
+
+})
+```
+
+Przegląd dowodów
+===
+
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+```{r echo = F, warning=F, message=F, comment=F}
+textInput("query", "Wpisz interwencję", "trastuzumab")
+textInput("disease", "Wpisz wskazanie", "breast cancer")
+
+checkboxGroupInput("pt", "Wybierz typ źródła", choices = c("Systematic Review", "Meta-Analysis", "Clinical Trial"))
+checkboxGroupInput("en", "Tylko po angielsku", choices = c("Tak"))
+dateRangeInput("years", "label", start = "2010-01", end = NULL, min = NULL,
+max = NULL, format = "yyyy-mm", startview = "month", weekstart = 0,
+language = "pl", separator = " do ", width = NULL)
+
+api_key = "adb7c4029ba414a3108f116d2f609e4aae08" 
+query <- "trastuzumab[Title] AND english[LA] AND Systematic Review	[PT] AND 2010:2022[DP]"
+res <- pmQueryTotalCount(query = query, api_key = api_key)
+D <- pmApiRequest(query = query, limit = res$total_count, api_key = NULL)
+M <- pmApi2df(D, format = "pubmed")
+M$AU1_CO<- M$SO_CO #przeksztalcenie na kraj
+M$AU_CO<- M$SO_CO
+
+
+```
+
+
+Column 
+-----------------------------------------------------------------------
+### **dd**
+
+```{r}
+kbl(data.frame("Title" = M$TI, 
+                        "Abstract" = M$AB)) %>%
+  kable_paper(bootstrap_options = "striped", full_width = T)
+
+```
+
+aaa
+===
+
+Column 
+-----------------------------------------------------------------------
+
+### **Podsumowanie wyszukania**
+```{r}
+
+results <- biblioAnalysis(M)
+sum <- summary(results, k=10, pause=T)
+```
+
+
+Literatura
+===
+  
+  * [Harrer 2021. Doing Meta-Analysis with R: A Hands-On Guide](https://www.routledge.com/Doing-Meta-Analysis-with-R-A-Hands-On-Guide/Harrer-Cuijpers-Furukawa-Ebert/p/book/9780367610074)
+  * [Balduzzi 2019. How to perform a meta-analysis with R: a practical tutorial](https://ebmh.bmj.com/content/ebmental/22/4/153.full.pdf)
